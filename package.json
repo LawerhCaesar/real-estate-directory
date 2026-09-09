@@ -10,10 +10,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "auth:hash": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
+    "jose": "^6.2.12",
     "next": "^16.3.4",
     "react": "19.2.6",
     "react-dom": "19.2.6"

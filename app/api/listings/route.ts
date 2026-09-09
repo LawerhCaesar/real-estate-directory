@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { ensureDatabase, rowToListing, type ListingRow } from '../../../db';
-import { ACCESS_TOKEN_COOKIE, getAdminIdentity, isSameOrigin } from '../../../lib/admin-auth';
+import { getAdminIdentity, isSameOrigin, SESSION_COOKIE } from '../../../lib/admin-auth';
 import { parseListingInput } from '../../../lib/listing-input';
 import { listings as seedListings } from '../../listings';
 
@@ -27,7 +27,7 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
   const cookieStore = await cookies();
-  const identity = await getAdminIdentity(cookieStore.get(ACCESS_TOKEN_COOKIE)?.value);
+  const identity = await getAdminIdentity(cookieStore.get(SESSION_COOKIE)?.value);
   if (!identity.authenticated) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
   if (!identity.authorized) return NextResponse.json({ error: 'Administrator access required.' }, { status: 403 });
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         INSERT INTO listings (area, title, size, price, deal, asset_type, notes, created_by, updated_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      args: [input.area, input.title, input.size, input.price, input.deal, input.assetType, input.notes ?? null, identity.email, identity.email],
+      args: [input.area, input.title, input.size, input.price, input.deal, input.assetType, input.notes ?? null, identity.username, identity.username],
     });
     const id = Number(result.lastInsertRowid);
     const created = await db.execute({ sql: `

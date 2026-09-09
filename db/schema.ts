@@ -14,5 +14,11 @@ export const createListingsTableSql = `
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
-  CREATE INDEX IF NOT EXISTS listings_active_area_idx ON listings (active, area)
+  CREATE INDEX IF NOT EXISTS listings_active_area_idx ON listings (active, area);
+  CREATE TABLE IF NOT EXISTS auth_attempts (
+    identifier TEXT PRIMARY KEY,
+    failures INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
 `;

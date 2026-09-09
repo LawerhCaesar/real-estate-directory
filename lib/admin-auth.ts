@@ -1,58 +1,94 @@
-export const ACCESS_TOKEN_COOKIE = 'hotwaves_access_token';
+import { scrypt, timingSafeEqual } from 'node:crypto';
+import { SignJWT, jwtVerify } from 'jose';
+
+export const SESSION_COOKIE = 'hotwaves_admin_session';
+export const SESSION_DURATION_SECONDS = 12 * 60 * 60;
 
 export type AdminIdentity = {
   authenticated: boolean;
   authorized: boolean;
-  email: string | null;
-  name: string | null;
+  username: string | null;
 };
 
-type VercelUser = {
-  email?: string;
-  name?: string;
-};
+const developmentUsername = 'hotwaves-team';
+const developmentPassword = 'hotwaves-dev';
+const developmentSecret = 'hotwaves-local-session-secret-not-for-production';
 
-function adminEmails() {
-  return (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
+function configuredUsername() {
+  return process.env.ADMIN_USERNAME?.trim() || (process.env.NODE_ENV !== 'production' ? developmentUsername : '');
 }
 
-export function isVercelAuthConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID && process.env.VERCEL_APP_CLIENT_SECRET);
+function sessionSecret() {
+  const value = process.env.SESSION_SECRET || (process.env.NODE_ENV !== 'production' ? developmentSecret : '');
+  if (value.length < 32) throw new Error('SESSION_SECRET must contain at least 32 characters.');
+  return new TextEncoder().encode(value);
 }
 
-export async function getAdminIdentity(accessToken?: string | null): Promise<AdminIdentity> {
-  if (process.env.NODE_ENV !== 'production' && !isVercelAuthConfigured()) {
-    const email = (process.env.DEV_ADMIN_EMAIL || adminEmails()[0] || 'developer@hotwaves.local').toLowerCase();
-    return { authenticated: true, authorized: true, email, name: 'Local development' };
-  }
+function derivePassword(password: string, salt: Buffer) {
+  return new Promise<Buffer>((resolve, reject) => {
+    scrypt(password, salt, 64, (error, key) => error ? reject(error) : resolve(key as Buffer));
+  });
+}
 
-  if (!accessToken) return { authenticated: false, authorized: false, email: null, name: null };
+async function passwordMatches(password: string, encodedHash: string) {
+  const [algorithm, saltValue, digestValue] = encodedHash.split('$');
+  if (algorithm !== 'scrypt' || !saltValue || !digestValue) return false;
 
   try {
-    const response = await fetch('https://api.vercel.com/login/oauth/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: 'no-store',
-    });
-    if (!response.ok) return { authenticated: false, authorized: false, email: null, name: null };
+    const salt = Buffer.from(saltValue, 'base64url');
+    const expected = Buffer.from(digestValue, 'base64url');
+    const actual = await derivePassword(password, salt);
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
+}
 
-    const user = await response.json() as VercelUser;
-    const email = user.email?.trim().toLowerCase() ?? null;
-    return {
-      authenticated: Boolean(email),
-      authorized: Boolean(email && adminEmails().includes(email)),
-      email,
-      name: user.name?.trim() || null,
-    };
-  } catch (error) {
-    console.error('Unable to validate administrator identity', error);
-    return { authenticated: false, authorized: false, email: null, name: null };
+export function isSharedAuthConfigured() {
+  if (process.env.NODE_ENV !== 'production') return true;
+  return Boolean(configuredUsername() && process.env.ADMIN_PASSWORD_HASH?.startsWith('scrypt$') && (process.env.SESSION_SECRET?.length ?? 0) >= 32);
+}
+
+export async function verifySharedCredentials(username: string, password: string) {
+  const expectedUsername = configuredUsername();
+  if (!expectedUsername || username !== expectedUsername) {
+    await derivePassword(password, Buffer.from('hotwaves-invalid-user'));
+    return false;
+  }
+
+  if (process.env.NODE_ENV !== 'production' && !process.env.ADMIN_PASSWORD_HASH) {
+    return password === developmentPassword;
+  }
+  return passwordMatches(password, process.env.ADMIN_PASSWORD_HASH ?? '');
+}
+
+export async function createSessionToken(username: string) {
+  return new SignJWT({ role: 'admin' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(username)
+    .setIssuedAt()
+    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
+    .sign(sessionSecret());
+}
+
+export async function getAdminIdentity(sessionToken?: string | null): Promise<AdminIdentity> {
+  if (!sessionToken) return { authenticated: false, authorized: false, username: null };
+
+  try {
+    const { payload } = await jwtVerify(sessionToken, sessionSecret(), { algorithms: ['HS256'] });
+    const valid = payload.role === 'admin' && payload.sub === configuredUsername();
+    return { authenticated: valid, authorized: valid, username: valid ? payload.sub ?? null : null };
+  } catch {
+    return { authenticated: false, authorized: false, username: null };
   }
 }
 
 export function isSameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   return !origin || origin === new URL(request.url).origin;
+}
+
+export function localDevelopmentCredentials() {
+  if (process.env.NODE_ENV === 'production' || process.env.ADMIN_PASSWORD_HASH) return null;
+  return { username: developmentUsername, password: developmentPassword };
 }
