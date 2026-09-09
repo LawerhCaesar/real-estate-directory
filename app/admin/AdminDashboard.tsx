@@ -95,7 +95,7 @@ export default function AdminDashboard({ userEmail }: { userEmail: string }) {
     <main className="admin-shell">
       <header className="admin-header">
         <Link className="brand" href="/"><span className="brand-mark">H</span><span className="brand-copy"><b>HOTWAVES</b><small>REAL ESTATE AGENCY</small></span></Link>
-        <div><span>{userEmail}</span><Link href="/">View public directory ↗</Link></div>
+        <div><span>{userEmail}</span><Link href="/">View public directory ↗</Link><form action="/api/auth/signout" method="post"><button>Sign out</button></form></div>
       </header>
 
       <section className="admin-intro">

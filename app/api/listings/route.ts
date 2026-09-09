@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { ensureDatabase, rowToListing, type ListingRow } from '../../../db';
-import { getAdminIdentity } from '../../../lib/admin-auth';
+import { ACCESS_TOKEN_COOKIE, getAdminIdentity, isSameOrigin } from '../../../lib/admin-auth';
 import { parseListingInput } from '../../../lib/listing-input';
 import { listings as seedListings } from '../../listings';
 
@@ -9,16 +10,14 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const db = await ensureDatabase();
-    if (!db) return NextResponse.json({ listings: seedListings, source: 'seed' });
-
-    const result = await db.prepare(`
+    const result = await db.execute(`
       SELECT id, area, title, size, price, deal, asset_type, notes
       FROM listings
       WHERE active = 1
       ORDER BY id ASC
-    `).all<ListingRow>();
+    `);
 
-    return NextResponse.json({ listings: result.results.map(rowToListing), source: 'database' });
+    return NextResponse.json({ listings: result.rows.map((row) => rowToListing(row as unknown as ListingRow)), source: 'database' });
   } catch (error) {
     console.error('Unable to read listings database', error);
     return NextResponse.json({ listings: seedListings, source: 'seed' });
@@ -26,7 +25,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const identity = getAdminIdentity(request.headers);
+  if (!isSameOrigin(request)) return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+  const cookieStore = await cookies();
+  const identity = await getAdminIdentity(cookieStore.get(ACCESS_TOKEN_COOKIE)?.value);
   if (!identity.authenticated) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
   if (!identity.authorized) return NextResponse.json({ error: 'Administrator access required.' }, { status: 403 });
 
@@ -35,28 +36,21 @@ export async function POST(request: Request) {
 
   try {
     const db = await ensureDatabase();
-    if (!db) return NextResponse.json({ error: 'The listings database is unavailable.' }, { status: 503 });
-
-    const result = await db.prepare(`
-      INSERT INTO listings (area, title, size, price, deal, asset_type, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      input.area,
-      input.title,
-      input.size,
-      input.price,
-      input.deal,
-      input.assetType,
-      input.notes ?? null,
-    ).run();
-    const id = Number(result.meta.last_row_id);
-    const created = await db.prepare(`
+    const result = await db.execute({
+      sql: `
+        INSERT INTO listings (area, title, size, price, deal, asset_type, notes, created_by, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [input.area, input.title, input.size, input.price, input.deal, input.assetType, input.notes ?? null, identity.email, identity.email],
+    });
+    const id = Number(result.lastInsertRowid);
+    const created = await db.execute({ sql: `
       SELECT id, area, title, size, price, deal, asset_type, notes
       FROM listings WHERE id = ?
-    `).bind(id).first<ListingRow>();
+    `, args: [id] });
 
-    if (!created) return NextResponse.json({ error: 'The listing could not be created.' }, { status: 500 });
-    return NextResponse.json({ listing: rowToListing(created) }, { status: 201 });
+    if (!created.rows[0]) return NextResponse.json({ error: 'The listing could not be created.' }, { status: 500 });
+    return NextResponse.json({ listing: rowToListing(created.rows[0] as unknown as ListingRow) }, { status: 201 });
   } catch (error) {
     console.error('Unable to create listing', error);
     return NextResponse.json({ error: 'The listing could not be saved.' }, { status: 500 });

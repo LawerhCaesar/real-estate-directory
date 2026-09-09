@@ -160,11 +160,16 @@ footer > div { display: flex; gap: 25px; }
 .admin-gate > section > p:not(.admin-kicker) { max-width: 510px; margin: 27px 0 32px; color: #64736d; font-family: Georgia, serif; font-size: 16px; line-height: 1.65; }
 .admin-primary-link { width: min(330px, 100%); padding: 16px 18px; display: flex; justify-content: space-between; background: var(--forest); color: white; font-size: 11px; }
 .admin-primary-link span { color: var(--lime); }
+.admin-primary-form { width: min(330px, 100%); }
+.admin-primary-form button { width: 100%; padding: 16px 18px; display: flex; justify-content: space-between; border: 0; background: var(--forest); color: white; font-size: 11px; cursor: pointer; }
+.admin-primary-form button span { color: var(--lime); }
 .admin-back-link { width: max-content; margin-top: 24px; display: block; color: #73817b; font-size: 10px; }
 .admin-shell { min-height: 100vh; background: #eceae3; }
 .admin-header { min-height: 78px; padding: 14px clamp(22px, 4vw, 60px); display: flex; align-items: center; justify-content: space-between; gap: 28px; background: white; border-bottom: 1px solid #dedfd9; }
 .admin-header > div { display: flex; align-items: center; gap: 25px; color: #7d8a84; font-size: 9px; }
 .admin-header > div a { padding: 11px 14px; background: var(--forest); color: white; }
+.admin-header > div form { margin: 0; }
+.admin-header > div form button { padding: 10px 0; border: 0; border-bottom: 1px solid #aab2ae; background: transparent; color: #65736d; font-size: 9px; cursor: pointer; }
 .admin-intro { padding: 42px clamp(22px, 4vw, 60px) 38px; display: grid; grid-template-columns: 1fr minmax(280px, 480px); align-items: end; gap: 40px; background: var(--forest); color: white; }
 .admin-intro h1 { color: white; font-size: clamp(40px, 5vw, 64px); }
 .admin-intro > p { margin: 0; color: #b6c3be; font-family: Georgia, serif; font-size: 14px; line-height: 1.7; }

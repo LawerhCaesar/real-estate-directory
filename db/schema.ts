@@ -9,7 +9,10 @@ export const createListingsTableSql = `
     asset_type TEXT NOT NULL CHECK (asset_type IN ('Bare land', 'Development property', 'Income property')),
     notes TEXT,
     active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT,
+    updated_by TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
+  );
+  CREATE INDEX IF NOT EXISTS listings_active_area_idx ON listings (active, area)
 `;
