@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
-const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const configuredSiteOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+const siteOrigin = configuredSiteOrigin && URL.canParse(configuredSiteOrigin)
+  ? configuredSiteOrigin
+  : 'http://localhost:3000';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
@@ -10,13 +13,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Prime Accra Property Opportunities | Hotwaves',
     description: 'Land, development properties, and joint ventures backed by 16+ years in the business.',
-    images: [{ url: `${siteOrigin}/og.png`, width: 1200, height: 630, alt: 'Hotwaves Real Estate Agency' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Hotwaves Real Estate Agency' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Prime Accra Property Opportunities | Hotwaves',
     description: 'Land, development properties, and joint ventures backed by 16+ years in the business.',
-    images: [`${siteOrigin}/og.png`],
+    images: ['/og.png'],
   },
 };
 
